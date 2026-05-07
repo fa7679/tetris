@@ -80,13 +80,13 @@ class TetrisGame:
 
     def draw_texts(self):
         self.canvas.delete('info')
-        self.canvas.create_text(340, 80, text='NEXT', fill='#ffffff', font=('Courier New', 14, 'bold'), tags='info')
-        self.canvas.create_text(340, 180, text='SCORE', fill='#ffffff', font=('Courier New', 12), tags='info')
+        self.canvas.create_text(340, 80, text='下一个', fill='#ffffff', font=('Courier New', 14, 'bold'), tags='info')
+        self.canvas.create_text(340, 180, text='分数', fill='#ffffff', font=('Courier New', 12), tags='info')
         self.canvas.create_text(340, 200, text=str(self.score), fill='#ffffff', font=('Courier New', 20, 'bold'), tags='info')
-        self.canvas.create_text(340, 240, text='LEVEL', fill='#ffffff', font=('Courier New', 12), tags='info')
+        self.canvas.create_text(340, 240, text='等级', fill='#ffffff', font=('Courier New', 12), tags='info')
         self.canvas.create_text(340, 260, text=str(self.level), fill='#ffffff', font=('Courier New', 20, 'bold'), tags='info')
 
-        controls = ['Controls:', '', '< > Move', 'v Soft Drop', 'Space Hard Drop', 'W Rotate', 'P Pause', 'Esc Quit']
+        controls = ['操作说明:', '', '← → 移动', '↓ 加速下落', '空格 快速落地', '↑ 旋转', 'P 暂停', 'Esc 退出']
         for i, line in enumerate(controls):
             self.canvas.create_text(340, 320 + i * 22, text=line, fill='#999999', font=('Courier New', 10), tags='info')
 
@@ -219,16 +219,16 @@ class TetrisGame:
         if self.game_over:
             self.canvas.delete('gameover')
             self.canvas.create_rectangle(100, 250, 400, 400, fill='#1a1a2e', outline='#ff0000', width=2, tags='gameover')
-            self.canvas.create_text(250, 280, text='GAME OVER', fill='#ff0000',
+            self.canvas.create_text(250, 280, text='游戏结束', fill='#ff0000',
                                    font=('Courier New', 28, 'bold'), tags='gameover')
-            self.canvas.create_text(250, 330, text=f'Final Score: {self.score}',
+            self.canvas.create_text(250, 330, text=f'最终分数: {self.score}',
                                    fill='#ffffff', font=('Courier New', 16), tags='gameover')
-            self.canvas.create_text(250, 370, text='Press R to Restart',
+            self.canvas.create_text(250, 370, text='按 R 重新开始',
                                    fill='#ffffff', font=('Courier New', 12), tags='gameover')
         elif self.paused:
             self.canvas.delete('paused')
             self.canvas.create_rectangle(150, 280, 350, 370, fill='#1a1a2e', outline='#ffffff', width=2, tags='paused')
-            self.canvas.create_text(250, 325, text='PAUSED', fill='#ffffff',
+            self.canvas.create_text(250, 325, text='暂停', fill='#ffffff',
                                    font=('Courier New', 24, 'bold'), tags='paused')
 
     def game_loop(self):
