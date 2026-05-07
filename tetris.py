@@ -18,14 +18,37 @@ COLORS = {
     'L': '#ff8000'
 }
 
+# Each shape is a 4x4 matrix with 1s marking where the block is
+# Using standard SRS-style coordinates
 SHAPES = {
-    'I': [(0,1), (1,1), (2,1), (3,1)],
-    'O': [(1,0), (2,0), (1,1), (2,1)],
-    'T': [(1,0), (0,1), (1,1), (2,1)],
-    'S': [(1,0), (2,0), (0,1), (1,1)],
-    'Z': [(0,0), (1,0), (1,1), (2,1)],
-    'J': [(0,0), (0,1), (1,1), (2,1)],
-    'L': [(2,0), (0,1), (1,1), (2,1)]
+    'I': [[0,0,0,0],
+          [1,1,1,1],
+          [0,0,0,0],
+          [0,0,0,0]],
+    'O': [[1,1,0,0],
+          [1,1,0,0],
+          [0,0,0,0],
+          [0,0,0,0]],
+    'T': [[0,1,0,0],
+          [1,1,1,0],
+          [0,0,0,0],
+          [0,0,0,0]],
+    'S': [[0,1,1,0],
+          [1,1,0,0],
+          [0,0,0,0],
+          [0,0,0,0]],
+    'Z': [[1,1,0,0],
+          [0,1,1,0],
+          [0,0,0,0],
+          [0,0,0,0]],
+    'J': [[1,0,0,0],
+          [1,1,1,0],
+          [0,0,0,0],
+          [0,0,0,0]],
+    'L': [[0,0,1,0],
+          [1,1,1,0],
+          [0,0,0,0],
+          [0,0,0,0]]
 }
 
 DARK_COLORS = {k: '#' + ''.join(hex(max(0, int(v[i:i+2], 16) - 40))[2:].zfill(2) for i in (1, 3, 5))
@@ -36,13 +59,22 @@ class Tetromino:
         self.type = random.choice(list(SHAPES.keys()))
         self.color = COLORS[self.type]
         self.dark_color = DARK_COLORS[self.type]
-        self.shape = SHAPES[self.type][:]
+        self.matrix = [row[:] for row in SHAPES[self.type]]
         self.x = GRID_WIDTH // 2 - 2
-        self.y = 0
+        self.y = -2
 
-    def rotate(self):
-        center = self.shape[1]
-        return [(center[0] + center[1] - y, center[1] - center[0] + x) for x, y in self.shape]
+    def rotate_clockwise(self):
+        n = len(self.matrix)
+        rotated = [[self.matrix[n-1-j][i] for j in range(n)] for i in range(n)]
+        return rotated
+
+    def get_blocks(self):
+        blocks = []
+        for y, row in enumerate(self.matrix):
+            for x, cell in enumerate(row):
+                if cell:
+                    blocks.append((x, y))
+        return blocks
 
 class TetrisGame:
     def __init__(self, root):
@@ -105,22 +137,28 @@ class TetrisGame:
         self.root.bind('s', lambda e: self.soft_drop())
         self.root.bind('w', lambda e: self.rotate())
 
-    def check_collision(self, piece, dx=0, dy=0, shape=None):
-        if shape is None:
-            shape = piece.shape
-        for x, y in shape:
-            new_x = piece.x + x + dx
-            new_y = piece.y + y + dy
-            if new_x < 0 or new_x >= GRID_WIDTH or new_y >= GRID_HEIGHT:
-                return True
-            if new_y >= 0 and self.grid[new_y][new_x] is not None:
-                return True
+    def check_collision(self, piece, dx=0, dy=0, matrix=None):
+        if matrix is None:
+            matrix = piece.matrix
+        for y, row in enumerate(matrix):
+            for x, cell in enumerate(row):
+                if cell:
+                    new_x = piece.x + x + dx
+                    new_y = piece.y + y + dy
+                    if new_x < 0 or new_x >= GRID_WIDTH or new_y >= GRID_HEIGHT:
+                        return True
+                    if new_y >= 0 and self.grid[new_y][new_x] is not None:
+                        return True
         return False
 
     def lock_piece(self):
-        for x, y in self.current_piece.shape:
-            if y >= 0:
-                self.grid[y][self.current_piece.x + x] = (self.current_piece.color, self.current_piece.dark_color)
+        for y, row in enumerate(self.current_piece.matrix):
+            for x, cell in enumerate(row):
+                if cell:
+                    gy = self.current_piece.y + y
+                    gx = self.current_piece.x + x
+                    if 0 <= gy < GRID_HEIGHT and 0 <= gx < GRID_WIDTH:
+                        self.grid[gy][gx] = (self.current_piece.color, self.current_piece.dark_color)
         self.clear_lines()
         self.current_piece = self.next_piece
         self.next_piece = Tetromino()
@@ -147,9 +185,9 @@ class TetrisGame:
 
     def rotate(self):
         if not self.game_over and not self.paused:
-            new_shape = self.current_piece.rotate()
-            if not self.check_collision(self.current_piece, shape=new_shape):
-                self.current_piece.shape = new_shape
+            new_matrix = self.current_piece.rotate_clockwise()
+            if not self.check_collision(self.current_piece, matrix=new_matrix):
+                self.current_piece.matrix = new_matrix
 
     def soft_drop(self):
         if not self.game_over and not self.paused:
@@ -186,6 +224,8 @@ class TetrisGame:
             self.canvas.delete('paused')
 
     def draw_block(self, x, y, color, dark_color, tag=''):
+        if y < 0:
+            return
         px = GRID_OFFSET_X + x * BLOCK_SIZE
         py = GRID_OFFSET_Y + y * BLOCK_SIZE
         self.canvas.create_rectangle(px + 1, py + 1, px + BLOCK_SIZE - 1, py + BLOCK_SIZE - 1,
@@ -202,15 +242,19 @@ class TetrisGame:
                     self.draw_block(x, y, color, dark_color, 'block')
 
         if not self.game_over:
-            for x, y in self.current_piece.shape:
-                self.draw_block(self.current_piece.x + x, self.current_piece.y + y,
-                               self.current_piece.color, self.current_piece.dark_color, 'block')
+            for y, row in enumerate(self.current_piece.matrix):
+                for x, cell in enumerate(row):
+                    if cell:
+                        self.draw_block(self.current_piece.x + x, self.current_piece.y + y,
+                                       self.current_piece.color, self.current_piece.dark_color, 'block')
 
-        for x, y in self.next_piece.shape:
-            px = 320 + x * BLOCK_SIZE
-            py = 100 + y * BLOCK_SIZE
-            self.canvas.create_rectangle(px + 1, py + 1, px + BLOCK_SIZE - 1, py + BLOCK_SIZE - 1,
-                                         fill=self.next_piece.color, outline=self.next_piece.dark_color, width=2, tags='next')
+        for y, row in enumerate(self.next_piece.matrix):
+            for x, cell in enumerate(row):
+                if cell:
+                    px = 320 + x * BLOCK_SIZE
+                    py = 100 + y * BLOCK_SIZE
+                    self.canvas.create_rectangle(px + 1, py + 1, px + BLOCK_SIZE - 1, py + BLOCK_SIZE - 1,
+                                                 fill=self.next_piece.color, outline=self.next_piece.dark_color, width=2, tags='next')
 
         self.draw_texts()
 
