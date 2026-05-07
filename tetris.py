@@ -1,6 +1,5 @@
 import tkinter as tk
 import random
-import threading
 import time
 
 GRID_WIDTH = 10
@@ -129,12 +128,11 @@ class TetrisGame:
             self.game_over = True
 
     def clear_lines(self):
-        lines = 0
-        for y in range(GRID_HEIGHT - 1, -1, -1):
-            if all(self.grid[y][x] is not None for x in range(GRID_WIDTH)):
-                del self.grid[y]
-                self.grid.insert(0, [None] * GRID_WIDTH)
-                lines += 1
+        full_rows = [y for y in range(GRID_HEIGHT) if all(self.grid[y][x] is not None for x in range(GRID_WIDTH))]
+        for y in reversed(full_rows):
+            del self.grid[y]
+            self.grid.insert(0, [None] * GRID_WIDTH)
+        lines = len(full_rows)
         if lines > 0:
             self.lines_cleared += lines
             points = [0, 100, 300, 500, 800]
