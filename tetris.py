@@ -61,7 +61,7 @@ class Tetromino:
         self.dark_color = DARK_COLORS[self.type]
         self.matrix = [row[:] for row in SHAPES[self.type]]
         self.x = GRID_WIDTH // 2 - 2
-        self.y = -2
+        self.y = 0
 
     def rotate_clockwise(self):
         n = len(self.matrix)
