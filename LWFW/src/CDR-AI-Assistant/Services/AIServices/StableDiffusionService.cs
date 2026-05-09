@@ -22,6 +22,11 @@ public class StableDiffusionService : IImageGeneratorService
         return await GenerateImageAsync(prompt, string.Empty, "512x512", ct);
     }
 
+    public async Task<string> GenerateTextWithContextAsync(string prompt, string context, string model, CancellationToken ct = default)
+    {
+        return await GenerateImageAsync(prompt, string.Empty, "512x512", ct);
+    }
+
     public async Task<string> GenerateImageAsync(
         string prompt,
         string negativePrompt,

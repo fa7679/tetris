@@ -62,6 +62,54 @@ public class OpenAIService : IAIService
         return result.choices[0].message.content.ToString();
     }
 
+    public async Task<string> GenerateTextWithContextAsync(string prompt, string context, string model, CancellationToken ct = default)
+    {
+        var cfg = _config.Load();
+        var apiKey = string.IsNullOrEmpty(cfg.EncryptedApiKey)
+            ? cfg.ApiKey
+            : _config.Decrypt(cfg.EncryptedApiKey);
+
+        if (string.IsNullOrEmpty(apiKey))
+            throw new InvalidOperationException("API Key 未配置，请在设置中配置您的 OpenAI API Key");
+
+        _httpClient.DefaultRequestHeaders.Clear();
+        _httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", apiKey);
+
+        var messages = new List<object>();
+        if (!string.IsNullOrEmpty(context))
+        {
+            messages.Add(new { role = "system", content = $"参考内容：\n{context}\n\n请根据以上内容生成文案。" });
+        }
+        messages.Add(new { role = "user", content = prompt });
+
+        var requestBody = new
+        {
+            model = model,
+            messages = messages.ToArray(),
+            temperature = 0.7,
+            max_tokens = 1000
+        };
+
+        var content = new StringContent(
+            JsonConvert.SerializeObject(requestBody),
+            Encoding.UTF8,
+            "application/json");
+
+        var response = await _httpClient.PostAsync(
+            $"{cfg.BaseURL}/chat/completions",
+            content,
+            ct);
+
+        response.EnsureSuccessStatusCode();
+
+        var json = await response.Content.ReadAsStringAsync(ct);
+        var result = JsonConvert.DeserializeObject<dynamic>(json)
+            ?? throw new InvalidOperationException("解析响应失败");
+
+        return result.choices[0].message.content.ToString();
+    }
+
     public async Task<bool> TestConnectionAsync()
     {
         try

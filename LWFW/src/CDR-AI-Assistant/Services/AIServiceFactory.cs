@@ -35,12 +35,18 @@ public class AIServiceFactory
         return cfg.SelectedAIProvider?.ToLower() switch
         {
             "stable diffusion" => new AIServices.StableDiffusionService(_httpClient, _config),
+            "midjourney" => new AIServices.MidjourneyService(_httpClient, _config),
             _ => null
         };
     }
 
     public static IEnumerable<string> GetAvailableProviders()
     {
-        return new[] { "OpenAI", "Claude", "Stable Diffusion" };
+        return new[] { "OpenAI", "Claude", "Stable Diffusion", "Midjourney" };
+    }
+
+    public static IEnumerable<string> GetImageProviders()
+    {
+        return new[] { "Stable Diffusion", "Midjourney" };
     }
 }

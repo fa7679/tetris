@@ -52,11 +52,19 @@ public class ConfigManager
     {
         try
         {
+            // 加密 OpenAI API Key
             if (!string.IsNullOrEmpty(config.ApiKey) && string.IsNullOrEmpty(config.EncryptedApiKey))
             {
                 config.EncryptedApiKey = Encrypt(config.ApiKey);
             }
             config.ApiKey = null;
+
+            // 加密 DeepL API Key
+            if (!string.IsNullOrEmpty(config.DeepLApiKey) && string.IsNullOrEmpty(config.DeepLApiKeyEncrypted))
+            {
+                config.DeepLApiKeyEncrypted = Encrypt(config.DeepLApiKey);
+            }
+            config.DeepLApiKey = null;
 
             var json = JsonConvert.SerializeObject(config, Formatting.Indented);
             File.WriteAllText(_configPath, json);

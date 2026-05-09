@@ -12,8 +12,10 @@ public partial class MainWindow : Window
     private readonly CDRHelper _cdrHelper;
     private readonly ConfigManager _configManager;
     private readonly AIServiceFactory _aiServiceFactory;
+    private readonly TranslationServiceFactory _translationServiceFactory;
     private readonly HttpClient _httpClient;
     private readonly ToolboxService _toolboxService;
+    private readonly TextSelectionService _textSelectionService;
 
     public MainWindow(CDRHelper cdrHelper)
     {
@@ -23,7 +25,9 @@ public partial class MainWindow : Window
         _configManager = new ConfigManager();
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         _aiServiceFactory = new AIServiceFactory(_configManager, _httpClient);
+        _translationServiceFactory = new TranslationServiceFactory(_httpClient, _configManager);
         _toolboxService = new ToolboxService(_cdrHelper, _configManager);
+        _textSelectionService = new TextSelectionService(cdrHelper);
 
         LoadConfig();
     }
@@ -36,11 +40,27 @@ public partial class MainWindow : Window
             BaseURLInput.Text = config.BaseURL;
             ModelNameInput.Text = config.ModelName;
             TimeoutInput.Text = config.TimeoutSeconds.ToString();
+            DefaultImageSizeInput.Text = config.DefaultImageSize;
+            DefaultExportFormatSelector.SelectedIndex = config.DefaultExportFormat == "JPG" ? 1 : 0;
 
             var apiKey = string.IsNullOrEmpty(config.EncryptedApiKey)
                 ? config.ApiKey
                 : _configManager.Decrypt(config.EncryptedApiKey);
             ApiKeyInput.Password = apiKey;
+
+            // DeepL API Key
+            var deeplKey = string.IsNullOrEmpty(config.DeepLApiKeyEncrypted)
+                ? config.DeepLApiKey
+                : _configManager.Decrypt(config.DeepLApiKeyEncrypted);
+            DeepLApiKeyInput.Password = deeplKey;
+
+            // Google Translate API Key
+            GoogleApiKeyInput.Text = config.GoogleTranslateApiKey;
+
+            // Midjourney 配置
+            MidjourneyApiUrlInput.Text = config.MidjourneyApiUrl;
+            MidjourneyCallbackUrlInput.Text = config.MidjourneyCallbackUrl;
+            MidjourneyEnabledCheckBox.IsChecked = config.MidjourneyEnabled;
 
             for (int i = 0; i < AIProviderSelector.Items.Count; i++)
             {
@@ -48,6 +68,17 @@ public partial class MainWindow : Window
                     item.Content.ToString() == config.SelectedAIProvider)
                 {
                     AIProviderSelector.SelectedIndex = i;
+                    break;
+                }
+            }
+
+            // 翻译服务选择
+            for (int i = 0; i < TranslationServiceSelector.Items.Count; i++)
+            {
+                if (TranslationServiceSelector.Items[i] is System.Windows.Controls.ComboBoxItem item &&
+                    item.Content.ToString() == config.SelectedTranslationProvider)
+                {
+                    TranslationServiceSelector.SelectedIndex = i;
                     break;
                 }
             }
@@ -83,14 +114,38 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ExportPNG_Click(object sender, RoutedEventArgs e)
+    private async void ExportPNG_Click(object sender, RoutedEventArgs e)
     {
         try
         {
             var dialog = new System.Windows.Forms.FolderBrowserDialog();
             if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
-                _toolboxService.ExportSelectedAsPNG(dialog.SelectedPath);
+                StatusText.Text = "正在导出...";
+                await _toolboxService.ExportSelectedAsPNGAsync(dialog.SelectedPath, (current, total) =>
+                {
+                    Dispatcher.Invoke(() => StatusText.Text = $"已导出 {current}/{total}...");
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _cdrHelper.ShowError($"导出失败: {ex.Message}");
+        }
+    }
+
+    private async void ExportJPG_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dialog = new System.Windows.Forms.FolderBrowserDialog();
+            if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                StatusText.Text = "正在导出...";
+                await _toolboxService.ExportSelectedAsJPGAsync(dialog.SelectedPath, 90, (current, total) =>
+                {
+                    Dispatcher.Invoke(() => StatusText.Text = $"已导出 {current}/{total}...");
+                });
             }
         }
         catch (Exception ex)
@@ -114,6 +169,11 @@ public partial class MainWindow : Window
     private void AlignCenter_Click(object sender, RoutedEventArgs e) => _toolboxService.SmartAlign("center");
     private void AlignLeft_Click(object sender, RoutedEventArgs e) => _toolboxService.SmartAlign("left");
     private void AlignRight_Click(object sender, RoutedEventArgs e) => _toolboxService.SmartAlign("right");
+    private void AlignTop_Click(object sender, RoutedEventArgs e) => _toolboxService.SmartAlign("top");
+    private void AlignBottom_Click(object sender, RoutedEventArgs e) => _toolboxService.SmartAlign("bottom");
+    private void AlignHCenter_Click(object sender, RoutedEventArgs e) => _toolboxService.SmartAlign("hcenter");
+    private void AlignVCenter_Click(object sender, RoutedEventArgs e) => _toolboxService.SmartAlign("vcenter");
+    private void AlignToPageCenter_Click(object sender, RoutedEventArgs e) => _toolboxService.AlignToPageCenter();
 
     private void CreateTestRectangle_Click(object sender, RoutedEventArgs e)
     {
@@ -174,7 +234,18 @@ public partial class MainWindow : Window
 
             var config = _configManager.Load();
             var service = _aiServiceFactory.GetService(config.SelectedAIProvider);
-            var result = await service.GenerateTextAsync(prompt, config.ModelName);
+
+            string result;
+            if (UseContextCheckBox.IsChecked == true)
+            {
+                var context = _textSelectionService.GetSelectedTextContent();
+                ContextText.Text = context;
+                result = await service.GenerateTextWithContextAsync(prompt, context, config.ModelName);
+            }
+            else
+            {
+                result = await service.GenerateTextAsync(prompt, config.ModelName);
+            }
 
             // 将结果插入到 CDR 文档
             var page = _cdrHelper.GetActivePage();
@@ -200,6 +271,12 @@ public partial class MainWindow : Window
             GenerateTextBtn.IsEnabled = true;
             GenerateTextBtn.Content = "✨ 生成文案";
         }
+    }
+
+    private void LoadContext_Click(object sender, RoutedEventArgs e)
+    {
+        var context = _textSelectionService.GetSelectedTextContent();
+        ContextText.Text = context;
     }
 
     private void ModelSelector_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
@@ -375,13 +452,16 @@ public partial class MainWindow : Window
         var langItem = TargetLangSelector.SelectedItem as System.Windows.Controls.ComboBoxItem;
         var targetLang = langItem?.Tag?.ToString() ?? "ZH";
 
+        var providerItem = TranslationServiceSelector.SelectedItem as System.Windows.Controls.ComboBoxItem;
+        var provider = providerItem?.Content?.ToString() ?? "DeepL";
+
         try
         {
             TranslateBtn.IsEnabled = false;
             TranslateBtn.Content = "翻译中...";
 
-            var translationService = new TranslationService(_httpClient, _configManager);
-            var result = await translationService.TranslateAsync(text, targetLang);
+            var service = _translationServiceFactory.GetService(provider);
+            var result = await service.TranslateAsync(text, targetLang);
 
             TranslateOutput.Text = result;
         }
@@ -409,7 +489,15 @@ public partial class MainWindow : Window
                 ApiKey = ApiKeyInput.Password,
                 ModelName = ModelNameInput.Text,
                 TimeoutSeconds = int.TryParse(TimeoutInput.Text, out var timeout) ? timeout : 120,
-                SelectedAIProvider = (AIProviderSelector.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "OpenAI"
+                SelectedAIProvider = (AIProviderSelector.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "OpenAI",
+                DefaultImageSize = DefaultImageSizeInput.Text,
+                DefaultExportFormat = (DefaultExportFormatSelector.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "PNG",
+                DeepLApiKey = DeepLApiKeyInput.Password,
+                GoogleTranslateApiKey = GoogleApiKeyInput.Text,
+                MidjourneyEnabled = MidjourneyEnabledCheckBox.IsChecked ?? false,
+                MidjourneyApiUrl = MidjourneyApiUrlInput.Text,
+                MidjourneyCallbackUrl = MidjourneyCallbackUrlInput.Text,
+                SelectedTranslationProvider = (TranslationServiceSelector.SelectedItem as System.Windows.Controls.ComboBoxItem)?.Content?.ToString() ?? "DeepL"
             };
 
             _configManager.Save(config);
@@ -464,6 +552,10 @@ public partial class MainWindow : Window
             case "Stable Diffusion":
                 BaseURLInput.Text = "http://localhost:7860";
                 ModelNameInput.Text = "stable-diffusion";
+                break;
+            case "Midjourney":
+                BaseURLInput.Text = "https://api.midjourney.com";
+                ModelNameInput.Text = "midjourney";
                 break;
         }
     }
