@@ -1,31 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>CDR_AI_Assistant</RootNamespace>
-    <AssemblyName>CDR-AI-Assistant</AssemblyName>
+    <AssemblyName>CDRAIAssistant</AssemblyName>
     <Version>1.0.0</Version>
-    <Authors>CDR AI Assistant Team</Authors>
-    <Description>CorelDRAW AI Assistant Plugin - AI-powered tools for CorelDRAW</Description>
-    <PlatformTarget>x64</PlatformTarget>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>x86</PlatformTarget>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="System.Net.Http.Json" Version="8.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="Corel.Interop.VGCore">
-      <HintPath>$(CorelSDKPath)Corel.Interop.VGCore.dll</HintPath>
+      <HintPath>C:\Program Files\Corel\CorelDRAW Graphics Suite\27\Programs64\Assemblies\Corel.Interop.VGCore.dll</HintPath>
       <EmbedInteropTypes>False</EmbedInteropTypes>
       <SpecificVersion>False</SpecificVersion>
     </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
 </Project>
